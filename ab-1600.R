@@ -1,6 +1,7 @@
 
 library(pdftools)
 library(tidyverse)
+library(scales)
 
 # downloading santa rosa's AB 1600 reports---only needs to be run once
 years <- c(2021, 2005:2014, 2020:2015)
@@ -13,6 +14,20 @@ for (i in 1:length(years)) {
     mode = 'wb'
   )
 }
+
+# downloading petaluma's AB 1600 reports
+#years_petaluma <- 2021:2016
+#for (i in 1:length(years_petaluma)) {
+#  download.file(
+#    url = paste0('https://storage.googleapis.com/proudcity/petalumaca/uploads/', 
+#                 years_petaluma[i], 
+#                 '/12/', 
+#                 years_petaluma[i], 
+#                 '-AB1600-Annual-Development-Fee-Report-FINAL.pdf'),
+#    destfile = paste0('fees/petaluma_', years_petaluma[i], '.pdf'),
+#    mode = 'wb'
+#  )
+#}
 
 
 all_years <- NULL
@@ -121,10 +136,43 @@ totals <- all_years %>%
   group_by(type, fund_clean, year) %>%
   summarize(total = sum(money, na.rm = TRUE))
 
-ggplot(totals %>% filter(type == 'expenditure'),
-       aes(x = year, y = total * -1, color = fund_clean, group = fund_clean)) +
+fees <- totals %>%
+  filter(type == 'collect') %>% 
+  group_by(year) %>% 
+  summarize(fees = sum(total))
+
+revenues <- c(312960000, 328010000, 383420000, 397280000, 460730000, 469530000, 561660000)
+
+totals_plot <- totals %>% 
+  filter(type == 'end',
+         fund_clean != 'public',
+         fund_clean != 'traffic') %>% 
+  mutate(fund_plot = case_when(
+    fund_clean == 'allocation' ~ 'Housing Allocation',
+    fund_clean == 'capital' ~ 'Capital Facilities',
+    fund_clean == 'park' ~ 'Park',
+    fund_clean == 'sewer' ~ 'Wastewater',
+    fund_clean == 'southeast' ~ 'Southeast Area',
+    fund_clean == 'southwest' ~ 'Southwest Area',
+    fund_clean == 'water' ~ 'Water'
+  ))
+
+ggplot(totals_plot,
+       aes(x = year, y = total, color = fund_plot, group = fund_plot)) +
   geom_line() +
-  geom_point()
+  geom_point() +
+  theme_bw() +
+  scale_y_continuous(labels = label_dollar()) +
+  scale_fill_discrete() +
+  labs(x = 'Fiscal Year',
+       y = 'Ending Fund Balance',
+       title = 'Santa Rosa Impact Fee Fund Balances, FY 2015-2021',
+       color = 'Fee Fund')
+
+ggsave(filename = 'sr-fee-balances.png',
+       width = 2000,
+       height = 1500,
+       units = 'px')
 
 
 # checking that math is correct---discrepancies are ~$1000 or less so this is good for now
@@ -132,3 +180,13 @@ clean %>%
   filter(type != 'end') %>%
   group_by(fund_clean) %>%
   summarize(sum = sum(money, na.rm = TRUE))
+
+
+
+
+
+pdf_ocr_text('fees/2012.pdf', pages = 8)
+
+pdf_ocr_data('fees/2012.pdf', pages = 8)
+
+pdf_info('fees/2014.pdf')
